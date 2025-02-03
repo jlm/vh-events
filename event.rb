@@ -34,7 +34,7 @@ def vtparse(evttime)
 end
 
 class Event
-  attr_reader :desc, :start, :end, :room, :url
+  attr_reader :desc, :start, :end, :room, :url, :weekly
 
   def initialize(event_hash, weekly_patterns)
     @start = vtparse(event_hash[:DTSTART])
@@ -52,5 +52,13 @@ class Event
 
   def short_event_times
     "#{@start.strftime('%A %-d %b %H:%M')} - #{@end.strftime('%H:%M')}"
+  end
+
+  def desc_and_times
+    "#{@desc} #{@start.strftime('%H:%M')} - #{@end.strftime('%H:%M')}"
+  end
+
+  def to_s
+    "#{@desc} #{@room} #{short_event_times}"
   end
 end

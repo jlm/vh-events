@@ -21,33 +21,12 @@ Bundler.require
 
 require 'vcalendar'
 require 'json'
-
-class TimeWithTimezone < Time
-  require 'timezone'
-
-  def self.find_timezone(zone)
-    Timezone[zone]
-  end
-end
-
-def vtparse(evttime)
-  tt = evttime[:value]
-  ts = "#{tt[:year]}-#{tt[:month]}-#{tt[:day]} #{tt[:hour]}:#{tt[:min]}:#{tt[:sec]} #{tt[:zone]}"
-  TimeWithTimezone.parse(ts)
-end
-
-def short_event_times(start, finish)
-  "#{start.strftime('%A %-d %b %H:%M')} - #{finish.strftime('%H:%M')}"
-end
-
-def desc_and_times(event)
-  "#{event[:desc]} #{event[:start].strftime('%H:%M')} - #{event[:end].strftime('%H:%M')}"
-end
+require './event'
 
 def print_events(events, title)
   puts title
   events.each do |pev|
-    puts "#{pev[:desc]} #{pev[:room]} #{pev[:short_event_times]}"
+    puts pev
   end
 end
 
@@ -94,47 +73,22 @@ begin
   events = rcal[:VCALENDAR][:VEVENT]
 
   parsed_events = events.map do |event|
-    starttime = vtparse(event[:DTSTART])
-    endtime = vtparse(event[:DTEND])
-    desc = event[:SUMMARY][:value]
-    weekly = false
-    config['weekly'].each do |pstr|
-      pattern = Regexp.new(pstr, 'i')
-      weekly = true if pattern.match? desc
-    end
-    descstr = event[:DESCRIPTION][:value].split(/\n/)
-    room = descstr[2]
-    url = event[:URL][:value]
-    {
-      desc: desc,
-      start: starttime,
-      end: endtime,
-      short_event_times: short_event_times(starttime, endtime),
-      room: room,
-      weekly: weekly,
-      url: url
-    }
+    Event.new(event, config['weekly'])
   end
 
-  parsed_events.sort_by! do |pev|
-    pev[:start]
-  end
+  parsed_events.sort_by!(&:start)
 
   unless opts.print_all?
     parsed_events.reject! do |pev|
-      pev[:start] < window_start || pev[:end] > window_end
+      pev.start < window_start || pev.end > window_end
     end
   end
 
   print_events(parsed_events, 'Events in window') if opts.print_all?
 
-  weekly_events = parsed_events.select do |pev|
-    pev[:weekly]
-  end
+  weekly_events = parsed_events.select(&:weekly)
 
-  other_events = parsed_events.reject do |pev|
-    pev[:weekly]
-  end
+  other_events = parsed_events.reject(&:weekly)
 
   puts "**** Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
 
@@ -142,14 +96,14 @@ begin
            6 => 'Saturday' }.freeze
   weekly_events_by_days = DAYS.map do |daynum, _dayname|
     weekly_events.select do |pev|
-      pev[:start].wday == daynum
+      pev.start.wday == daynum
     end
   end
   _james = 3
   DAYS.each do |daynum, dayname|
     puts "#{dayname}:"
     weekly_events_by_days[daynum].each do |pev|
-      puts "    #{desc_and_times(pev)}"
+      puts "    #{pev.desc_and_times}"
     end
   end
 
