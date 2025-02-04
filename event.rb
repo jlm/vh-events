@@ -34,16 +34,26 @@ def vtparse(evttime)
 end
 
 class Event
-  attr_reader :desc, :start, :end, :room, :url, :weekly
+  attr_reader :desc, :start, :day, :end, :room, :url, :weekly
+
+  include Comparable
+  def <=>(other)
+    start <=> other.start
+  end
 
   def initialize(event_hash, weekly_patterns)
     @start = vtparse(event_hash[:DTSTART])
+    @day = @start.wday
     @end = vtparse(event_hash[:DTEND])
     @desc = event_hash[:SUMMARY][:value]
     @weekly = false
     weekly_patterns.each do |pstr|
-      pattern = Regexp.new(pstr, 'i')
-      @weekly = true if pattern.match? desc
+      (patternstr, substitute) = pstr.split('|')
+      pattern = Regexp.new(patternstr, 'i')
+      if pattern.match? desc
+        @weekly = true
+        @desc = substitute if substitute
+      end
     end
     descstr = event_hash[:DESCRIPTION][:value].split(/\n/)
     @room = descstr[2]
@@ -58,7 +68,11 @@ class Event
     "#{@desc} #{@start.strftime('%H:%M')} - #{@end.strftime('%H:%M')}"
   end
 
-  def to_s
+  def to_slong
     "#{@desc} #{@room} #{short_event_times}"
+  end
+
+  def to_s
+    "#{desc_and_times}"
   end
 end
