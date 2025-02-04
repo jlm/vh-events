@@ -37,9 +37,9 @@ begin
     o.integer '-y', '--year', 'the year to search'
     o.integer '-m', '--month', 'the month to search'
     o.bool '-d', '--debug', 'debug mode'
-    o.bool '--print-all', 'print all selected events'
-    o.bool '-v', '--verbose', 'be verbose: list extra detail (unimplemented)'
-    o.bool '-j', '--json', 'output results in JSON'
+    o.bool '-a', '--print-all', 'print all selected events'
+    o.bool '-v', '--verbose', 'be verbose: list extra detail'
+    o.string '-j', '--json', 'output results in JSON to the named file'
     o.bool '--slackpost', 'post alerts to Slack for new items'
     o.bool '-l', '--list', 'list events'
     o.bool '--list-sizes', 'List available slug sizes'
@@ -60,12 +60,13 @@ begin
   end
 
   config = YAML.safe_load_file(opts[:config])
+  jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
 
-  month = opts[:month] || Time.now.strftime('%m').to_i
+  month = opts[:month] || (Date.new >> 2).strftime('%m').to_i
   year = opts[:year] || Time.now.strftime('%Y').to_i
   window_start = Date.new(year, month, 1).to_time
   window_end = (Date.new(year, month, 1) >> 1).to_time
-  puts "Selected month: #{year} #{month}"
+  puts "Selected month: #{year} #{month}" if opts.debug?
   ics = nil
   ics = File.read opts[:read_file] if opts[:read_file]
   cal = Vcalendar.parse(ics, false)
@@ -78,34 +79,32 @@ begin
 
   parsed_events.sort_by!(&:start)
 
-  unless opts.print_all?
+  if opts.print_all?
+    print_events(parsed_events, 'Events in window')
+  else
     parsed_events.reject! do |pev|
       pev.start < window_start || pev.end > window_end
     end
   end
 
-  print_events(parsed_events, 'Events in window') if opts.print_all?
-
   weekly_events = parsed_events.select(&:weekly)
-
   other_events = parsed_events.reject(&:weekly)
 
-  puts "**** Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
+  if opts.verbose?
+    puts "* Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
+  end
 
   DAYS = { 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday',
            6 => 'Saturday' }.freeze
-  weekly_events_by_days = DAYS.map do |daynum, _dayname|
-    weekly_events.select do |pev|
-      pev.start.wday == daynum
-    end
+
+  wkt = weekly_events.sort_by(&:day).sort_by(&:start).uniq(&:desc_and_times).sort_by(&:day).group_by(&:day)
+  wkt_by_day = wkt.map do |day, pevs|
+    { day: DAYS[day], events: pevs.sort_by(&:start).group_by(&:room) }
   end
-  _james = 3
-  DAYS.each do |daynum, dayname|
-    puts "#{dayname}:"
-    weekly_events_by_days[daynum].each do |pev|
-      puts "    #{pev.desc_and_times}"
-    end
-  end
+
+  jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
+
+  _james = 2
 
   # print_events(weekly_events, 'Weekly Events')
 end
