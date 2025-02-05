@@ -6,6 +6,8 @@ gem 'base64'
 gem 'bundler', '~> 2'
 gem 'logger'
 gem 'rubocop', group: 'development', require: false
+gem 'rubyXL'
+gem 'rubyzip', '~> 2.4.0'
 gem 'slop'
 gem 'timezone'
 gem 'vobject'

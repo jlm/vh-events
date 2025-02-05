@@ -7,3 +7,6 @@ weekly:
   - toddler group|Baby and Toddler Group
   - yoga
   - circuit
+  - badminton
+excel:
+  template: template/table-only.xlsx

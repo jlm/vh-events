@@ -30,6 +30,28 @@ def print_events(events, title)
   end
 end
 
+def parse_template(worksheet, opts)
+  dayrow = nil # Excel row number of the row starting with "Day"
+  daycol = nil # Excel column number of the column containing "Day"
+  roomcount = nil
+  worksheet.each do |row|
+    (0..(row.size - 1)).each do |column|
+      cell = row[column]
+      if cell&.value == 'Day'
+        dayrow = row.r - 1
+        daycol = column
+        roomcount = row.size - 1 - daycol
+        puts "Day cell: #{cell.r}" if opts.debug?
+        break
+      end
+      break if daycol
+    end
+  end
+  raise '"Day" cell not found in template spreadsheet' if daycol.nil?
+
+  [dayrow, daycol, roomcount]
+end
+
 begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
@@ -40,6 +62,7 @@ begin
     o.bool '-a', '--print-all', 'print all selected events'
     o.bool '-v', '--verbose', 'be verbose: list extra detail'
     o.string '-j', '--json', 'output results in JSON to the named file'
+    o.string '-x', '--excel', 'output results in XLSX to the named file'
     o.bool '--slackpost', 'post alerts to Slack for new items'
     o.bool '-l', '--list', 'list events'
     o.bool '--list-sizes', 'List available slug sizes'
@@ -62,11 +85,15 @@ begin
   config = YAML.safe_load_file(opts[:config])
   jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
 
+  # If month is specified and is zero, select all events rather than just that month's events.
+  # NB: could just check for month == 0.
+  select_all = opts[:month] && (opts[:month]).zero?
   month = opts[:month] || (Date.new >> 2).strftime('%m').to_i
   year = opts[:year] || Time.now.strftime('%Y').to_i
   window_start = Date.new(year, month, 1).to_time
   window_end = (Date.new(year, month, 1) >> 1).to_time
   puts "Selected month: #{year} #{month}" if opts.debug?
+
   ics = nil
   ics = File.read opts[:read_file] if opts[:read_file]
   cal = Vcalendar.parse(ics, false)
@@ -79,9 +106,9 @@ begin
 
   parsed_events.sort_by!(&:start)
 
-  if opts.print_all?
-    print_events(parsed_events, 'Events in window')
-  else
+  print_events(parsed_events, 'Events in window') if opts.print_all?
+
+  unless select_all
     parsed_events.reject! do |pev|
       pev.start < window_start || pev.end > window_end
     end
@@ -104,7 +131,37 @@ begin
 
   jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
 
-  _james = 2
+  if opts[:excel]
+    begin
+      workbook = RubyXL::Parser.parse(config['excel']['template'])
+    rescue Zip::Error => e
+      abort e.message
+    end
+
+    worksheet = workbook[0]
+    (dayrow, daycol, roomcount) = parse_template(worksheet, opts)
+    roomcolumns = {}
+    ((daycol + 1)..(daycol + roomcount)).each do |column|
+      roomcolumns[worksheet[dayrow][column]&.value] = column
+    end
+
+    _james = 2
+
+    wkt_by_day.each do |entry|
+      day = entry[:day]
+      daydata = entry[:events]
+      ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
+        if worksheet[rownumber][daycol].value == day
+          puts "Row #{day} is #{rownumber}" if opts.debug?
+          daydata.each do |room, pevs|
+            _james = 4
+            worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:to_s).join("\n"))
+          end
+        end
+      end
+    end
+    workbook.write(opts[:excel])
+  end
 
   # print_events(weekly_events, 'Weekly Events')
 end
