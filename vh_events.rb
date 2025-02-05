@@ -30,7 +30,7 @@ def print_events(events, title)
   end
 end
 
-def parse_template(worksheet, opts)
+def parse_template(worksheet, debug)
   dayrow = nil # Excel row number of the row starting with "Day"
   daycol = nil # Excel column number of the column containing "Day"
   roomcount = nil
@@ -41,7 +41,7 @@ def parse_template(worksheet, opts)
         dayrow = row.r - 1
         daycol = column
         roomcount = row.size - 1 - daycol
-        puts "Day cell: #{cell.r}" if opts.debug?
+        puts "Day cell: #{cell.r}" if debug
         break
       end
       break if daycol
@@ -49,7 +49,35 @@ def parse_template(worksheet, opts)
   end
   raise '"Day" cell not found in template spreadsheet' if daycol.nil?
 
-  [dayrow, daycol, roomcount]
+  roomcolumns = {}
+  ((daycol + 1)..(daycol + roomcount)).each do |column|
+    roomcolumns[worksheet[dayrow][column]&.value] = column
+  end
+  [dayrow, daycol, roomcolumns]
+end
+
+def output_events_as_xlsx(wkt_by_day, other_events, excel_filename, excel_conf, debug)
+  begin
+    workbook = RubyXL::Parser.parse(excel_conf['template'])
+  rescue Zip::Error => e
+    abort e.message
+  end
+
+  worksheet = workbook[0]
+  (dayrow, daycol, roomcolumns) = parse_template(worksheet, debug)
+
+  wkt_by_day.each do |entry|
+    day = entry[:day]
+    daydata = entry[:events]
+    ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
+      next unless worksheet[rownumber][daycol].value == day
+
+      daydata.each do |room, pevs|
+        worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:to_s).join("\n"))
+      end
+    end
+  end
+  workbook.write(excel_filename)
 end
 
 begin
@@ -103,11 +131,8 @@ begin
   parsed_events = events.map do |event|
     Event.new(event, config['weekly'])
   end
-
   parsed_events.sort_by!(&:start)
-
   print_events(parsed_events, 'Events in window') if opts.print_all?
-
   unless select_all
     parsed_events.reject! do |pev|
       pev.start < window_start || pev.end > window_end
@@ -130,38 +155,7 @@ begin
   end
 
   jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
-
-  if opts[:excel]
-    begin
-      workbook = RubyXL::Parser.parse(config['excel']['template'])
-    rescue Zip::Error => e
-      abort e.message
-    end
-
-    worksheet = workbook[0]
-    (dayrow, daycol, roomcount) = parse_template(worksheet, opts)
-    roomcolumns = {}
-    ((daycol + 1)..(daycol + roomcount)).each do |column|
-      roomcolumns[worksheet[dayrow][column]&.value] = column
-    end
-
-    _james = 2
-
-    wkt_by_day.each do |entry|
-      day = entry[:day]
-      daydata = entry[:events]
-      ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-        if worksheet[rownumber][daycol].value == day
-          puts "Row #{day} is #{rownumber}" if opts.debug?
-          daydata.each do |room, pevs|
-            _james = 4
-            worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:to_s).join("\n"))
-          end
-        end
-      end
-    end
-    workbook.write(opts[:excel])
-  end
+  output_events_as_xlsx(wkt_by_day, other_events, opts[:excel], config['excel'], opts.debug?) if opts[:excel]
 
   # print_events(weekly_events, 'Weekly Events')
 end
