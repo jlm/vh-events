@@ -1,3 +1,4 @@
+url: https://v2.hallmaster.co.uk/api/ical/GetICalStream?HallId=7609&listrooms=true&splitseries=true&onlyconfirmed=true
 weekly:
   - pilates
   - dance class
