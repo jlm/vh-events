@@ -2,6 +2,7 @@
 
 source 'https://rubygems.org'
 
+gem 'activesupport'
 gem 'base64'
 gem 'bundler', '~> 2'
 gem 'logger'

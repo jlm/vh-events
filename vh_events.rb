@@ -21,7 +21,11 @@ Bundler.require
 
 require 'vcalendar'
 require 'json'
+require 'active_support/core_ext/integer/inflections'
 require './event'
+
+DAYS = { 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday',
+         6 => 'Saturday' }.freeze
 
 def print_events(events, title)
   puts title
@@ -64,19 +68,39 @@ def output_events_as_xlsx(wkt_by_day, other_events, excel_filename, excel_conf, 
   end
 
   worksheet = workbook[0]
-  (dayrow, daycol, roomcolumns) = parse_template(worksheet, debug)
+  dayrow, daycol, roomcolumns = parse_template(worksheet, debug)
 
   wkt_by_day.each do |entry|
-    day = entry[:day]
-    daydata = entry[:events]
     ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-      next unless worksheet[rownumber][daycol].value == day
+      next unless worksheet[rownumber][daycol].value == entry[:day]
 
-      daydata.each do |room, pevs|
+      entry[:events].each do |room, pevs|
         worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:to_s).join("\n"))
       end
     end
   end
+
+  # Find the monthly events section in the template
+  other_events_startline = nil
+  ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
+    next if DAYS.values.include?(worksheet[rownumber][daycol].value)
+
+    other_events_startline = rownumber
+    break
+  end
+  raise "Couldn't find start of monthly section" unless other_events_startline
+
+  rownumber = other_events_startline
+  other_events.each do |event|
+    rownumber += 1
+    datestring = event.start.strftime('%a ') + event.start.day.ordinalize + event.start.strftime(' %b')
+    worksheet.add_cell(rownumber, daycol, datestring)
+    # puts "#{event} #{rownumber} #{event.room} #{datestring}" if debug
+    event.room.split(', ').each do |room|
+      worksheet.add_cell(rownumber, roomcolumns[room], event.to_s)
+    end
+  end
+
   workbook.write(excel_filename)
 end
 
@@ -91,19 +115,7 @@ begin
     o.bool '-v', '--verbose', 'be verbose: list extra detail'
     o.string '-j', '--json', 'output results in JSON to the named file'
     o.string '-x', '--excel', 'output results in XLSX to the named file'
-    o.bool '--slackpost', 'post alerts to Slack for new items'
     o.bool '-l', '--list', 'list events'
-    o.bool '--list-sizes', 'List available slug sizes'
-    o.bool '--list-images', 'List available OS images'
-    o.string '--region', 'region to create the vm in'
-    o.string '--size', 'size_slug of the vm to be created'
-    o.string '--ipv6', 'enable ipv6?'
-    o.string '--image', 'image name of the vm to be created'
-    o.string '--tags', 'list of tags to tag the vm with'
-    o.bool '--destroy', 'destroy the vm'
-    o.string '--dhdns-add', 'add the vm to the given domain in Dreamhost DNS'
-    o.string '--dhdns-remove', 'remove the Dreamhost DNS name of the vm from the given domain'
-    o.bool '--force', 'try to force the operation despite errors'
     o.on '--help' do
       warn o
       exit
@@ -112,6 +124,7 @@ begin
 
   config = YAML.safe_load_file(opts[:config])
   jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
+  puts "Writing Excel output to #{opts[:excel]}" if opts[:excel] && opts.verbose?
 
   # If month is specified and is zero, select all events rather than just that month's events.
   # NB: could just check for month == 0.
@@ -145,9 +158,6 @@ begin
   if opts.verbose?
     puts "* Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
   end
-
-  DAYS = { 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday',
-           6 => 'Saturday' }.freeze
 
   wkt = weekly_events.sort_by(&:day).sort_by(&:start).uniq(&:desc_and_times).sort_by(&:day).group_by(&:day)
   wkt_by_day = wkt.map do |day, pevs|
