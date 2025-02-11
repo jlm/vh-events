@@ -60,7 +60,52 @@ def parse_template(worksheet, debug)
   [dayrow, daycol, roomcolumns]
 end
 
-def output_events_as_xlsx(wkt_by_day, other_events, excel_filename, excel_conf, debug)
+def find_monthly_section(worksheet, dayrow, daycol)
+  ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
+    next if DAYS.values.include?(worksheet[rownumber][daycol].value)
+
+    return rownumber
+  end
+  nil
+end
+
+def add_monthly_events_to_worksheet(worksheet, other_events_by_date, other_events_startline, daycol, roomcolumns, debug)
+  (0..(other_events_by_date.length - 1)).each do |ev_index|
+    rownumber = other_events_startline + 1 + ev_index
+    oe_entry = other_events_by_date[ev_index]
+    date = oe_entry[:date]
+    datestring = date.strftime('%a ') + date.day.ordinalize + date.strftime(' %b')
+    worksheet.add_cell(rownumber, daycol, datestring)
+    event_descs = {}
+    oe_entry[:events].each_value do |pevs|
+      pevs.each do |event|
+        event.room.split(', ').each do |room|
+          puts "#{rownumber} #{datestring} #{room} #{event.desc_and_times}" if debug
+          event_descs[room] ||= []
+          event_descs[room] << event.desc_and_times
+        end
+      end
+    end
+    event_descs.each do |room, event_descriptions|
+      worksheet.add_cell(rownumber, roomcolumns[room], event_descriptions.join("\n"))
+    end
+  end
+
+end
+
+def add_weekly_events_to_worksheet(worksheet, wkt_by_day, dayrow, daycol, roomcolumns, debug)
+  wkt_by_day.each do |entry|
+    ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
+      next unless worksheet[rownumber][daycol].value == entry[:day]
+
+      entry[:events].each do |room, pevs|
+        worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
+      end
+    end
+  end
+end
+
+def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, excel_conf, debug)
   begin
     workbook = RubyXL::Parser.parse(excel_conf['template'])
   rescue Zip::Error => e
@@ -69,37 +114,11 @@ def output_events_as_xlsx(wkt_by_day, other_events, excel_filename, excel_conf, 
 
   worksheet = workbook[0]
   dayrow, daycol, roomcolumns = parse_template(worksheet, debug)
-
-  wkt_by_day.each do |entry|
-    ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-      next unless worksheet[rownumber][daycol].value == entry[:day]
-
-      entry[:events].each do |room, pevs|
-        worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:to_s).join("\n"))
-      end
-    end
-  end
-
-  # Find the monthly events section in the template
-  other_events_startline = nil
-  ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-    next if DAYS.values.include?(worksheet[rownumber][daycol].value)
-
-    other_events_startline = rownumber
-    break
-  end
+  add_weekly_events_to_worksheet(worksheet, wkt_by_day, dayrow, daycol, roomcolumns, debug)
+  other_events_startline = find_monthly_section(worksheet, dayrow, daycol)
   raise "Couldn't find start of monthly section" unless other_events_startline
 
-  rownumber = other_events_startline
-  other_events.each do |event|
-    rownumber += 1
-    datestring = event.start.strftime('%a ') + event.start.day.ordinalize + event.start.strftime(' %b')
-    worksheet.add_cell(rownumber, daycol, datestring)
-    # puts "#{event} #{rownumber} #{event.room} #{datestring}" if debug
-    event.room.split(', ').each do |room|
-      worksheet.add_cell(rownumber, roomcolumns[room], event.to_s)
-    end
-  end
+  add_monthly_events_to_worksheet(worksheet, other_events_by_date, other_events_startline, daycol, roomcolumns, debug)
 
   workbook.write(excel_filename)
 end
@@ -164,8 +183,12 @@ begin
     { day: DAYS[day], events: pevs.sort_by(&:start).group_by(&:room) }
   end
 
+  ott = other_events.group_by(&:date).map do |date, pevs|
+    { date: date, events: pevs.sort_by(&:start).group_by(&:room) }
+  end
+
   jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
-  output_events_as_xlsx(wkt_by_day, other_events, opts[:excel], config['excel'], opts.debug?) if opts[:excel]
+  output_events_as_xlsx(wkt_by_day, ott, opts[:excel], config['excel'], opts.debug?) if opts[:excel]
 
   # print_events(weekly_events, 'Weekly Events')
 end
