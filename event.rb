@@ -68,11 +68,15 @@ class Event
     "#{@desc} #{@start.strftime('%H:%M')} - #{@end.strftime('%H:%M')}"
   end
 
+  def date
+    @start.to_date
+  end
+
   def to_slong
     "#{@desc} #{@room} #{short_event_times}"
   end
 
   def to_s
-    "#{desc_and_times}"
+    "#{@start.to_date} #{desc_and_times}"
   end
 end
