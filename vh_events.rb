@@ -23,6 +23,7 @@ require 'vcalendar'
 require 'json'
 require 'active_support/core_ext/integer/inflections'
 require './event'
+require './template_parser'
 
 DAYS = { 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday',
          6 => 'Saturday' }.freeze
@@ -34,93 +35,51 @@ def print_events(events, title)
   end
 end
 
-def parse_template(worksheet, debug)
-  dayrow = nil # Excel row number of the row starting with "Day"
-  daycol = nil # Excel column number of the column containing "Day"
-  roomcount = nil
-  worksheet.each do |row|
-    (0..(row.size - 1)).each do |column|
-      cell = row[column]
-      if cell&.value == 'Day'
-        dayrow = row.r - 1
-        daycol = column
-        roomcount = row.size - 1 - daycol
-        puts "Day cell: #{cell.r}" if debug
-        break
-      end
-      break if daycol
-    end
-  end
-  raise '"Day" cell not found in template spreadsheet' if daycol.nil?
-
-  roomcolumns = {}
-  ((daycol + 1)..(daycol + roomcount)).each do |column|
-    roomcolumns[worksheet[dayrow][column]&.value] = column
-  end
-  [dayrow, daycol, roomcolumns]
-end
-
-def find_monthly_section(worksheet, dayrow, daycol)
-  ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-    next if DAYS.values.include?(worksheet[rownumber][daycol].value)
-
-    return rownumber
-  end
-  nil
-end
-
-def add_monthly_events_to_worksheet(worksheet, other_events_by_date, other_events_startline, daycol, roomcolumns, debug)
+def add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
   (0..(other_events_by_date.length - 1)).each do |ev_index|
     rownumber = other_events_startline + 1 + ev_index
     oe_entry = other_events_by_date[ev_index]
     date = oe_entry[:date]
     datestring = date.strftime('%a ') + date.day.ordinalize + date.strftime(' %b')
-    worksheet.add_cell(rownumber, daycol, datestring)
+    template.worksheet.add_cell(rownumber, template.daycol, datestring)
     event_descs = {}
     oe_entry[:events].each_value do |pevs|
       pevs.each do |event|
         event.room.split(', ').each do |room|
-          puts "#{rownumber} #{datestring} #{room} #{event.desc_and_times}" if debug
+          puts "#{rownumber} #{datestring} #{room} #{event.desc_and_times}" if template.debug
           event_descs[room] ||= []
           event_descs[room] << event.desc_and_times
         end
       end
     end
     event_descs.each do |room, event_descriptions|
-      worksheet.add_cell(rownumber, roomcolumns[room], event_descriptions.join("\n"))
+      template.worksheet.add_cell(rownumber, template.roomcolumns[room], event_descriptions.join("\n"))
     end
   end
-
 end
 
-def add_weekly_events_to_worksheet(worksheet, wkt_by_day, dayrow, daycol, roomcolumns, debug)
+def add_weekly_events_to_worksheet(template, wkt_by_day)
   wkt_by_day.each do |entry|
-    ((dayrow + 1)..(dayrow + 8)).each do |rownumber|
-      next unless worksheet[rownumber][daycol].value == entry[:day]
+    ((template.dayrow + 1)..(template.dayrow + 8)).each do |rownumber|
+      next unless template.worksheet[rownumber][template.daycol].value == entry[:day]
 
       entry[:events].each do |room, pevs|
-        worksheet.add_cell(rownumber, roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
+        template.worksheet.add_cell(rownumber, template.roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
       end
     end
   end
 end
 
 def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, excel_conf, debug)
-  begin
-    workbook = RubyXL::Parser.parse(excel_conf['template'])
-  rescue Zip::Error => e
-    abort e.message
-  end
+  template = TemplateParser.new(excel_conf['template'], DAYS, debug: debug)
 
-  worksheet = workbook[0]
-  dayrow, daycol, roomcolumns = parse_template(worksheet, debug)
-  add_weekly_events_to_worksheet(worksheet, wkt_by_day, dayrow, daycol, roomcolumns, debug)
-  other_events_startline = find_monthly_section(worksheet, dayrow, daycol)
+  add_weekly_events_to_worksheet(template, wkt_by_day)
+  other_events_startline = template.find_monthly_section
   raise "Couldn't find start of monthly section" unless other_events_startline
 
-  add_monthly_events_to_worksheet(worksheet, other_events_by_date, other_events_startline, daycol, roomcolumns, debug)
+  add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
 
-  workbook.write(excel_filename)
+  template.workbook.write(excel_filename)
 end
 
 begin
