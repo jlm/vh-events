@@ -6,6 +6,7 @@ gem 'activesupport'
 gem 'base64'
 gem 'bundler', '~> 2'
 gem 'logger'
+gem 'open-uri'
 gem 'rubocop', group: 'development', require: false
 gem 'rubyXL'
 gem 'rubyzip', '~> 2.4.0'
