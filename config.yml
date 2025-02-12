@@ -9,5 +9,6 @@ weekly:
   - yoga
   - circuit
   - badminton
+  - adult tap
 excel:
   template: template/table-only.xlsx
