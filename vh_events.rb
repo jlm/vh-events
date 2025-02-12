@@ -97,7 +97,7 @@ begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
     o.string '-r', '--read-file', 'Read iCal data from file'
-    o.integer '-m', '--month', 'the month to search, default: next month'
+    o.integer '-m', '--month', 'the (numeric) month to search, default: next month'
     o.integer '-y', '--year', 'the year to search'
     o.bool '-d', '--debug', 'debug mode'
     o.bool '-a', '--print-all', 'print all events'
