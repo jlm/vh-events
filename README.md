@@ -11,6 +11,8 @@ presentation issues, instead preserving those from the template spreadsheet.
 
 Usage
 =====
+Create the Excel template file (which is in XLSX format) and place it in the `template` directory.
+An example is provided as `template/table-only.xlsx`.
 
 Typical usage:
 ```aiignore
