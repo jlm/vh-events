@@ -78,10 +78,21 @@ def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, exce
   raise "Couldn't find start of monthly section" unless other_events_startline
 
   add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
-
   template.workbook.write(excel_filename)
 end
 
+# This program parses a Vcalendar feed of Village Hall events produced by Hallmaster, and produces
+# an Excel spreadsheet for inclusion in the Magazine.  A configuration file (config.yml) allows events to be
+# categorized as weekly (with others being designated non-weekly), and to be recognised using a regular expression
+# rather than an exact text match.  It also allows events to be renamed in the output table. (Although Hallmaster
+# has a "weekly" event field, many events in the database which are weekly are not marked as such.)
+# The spreadsheet is based on a template spreadsheet provided as input,
+# which can be hand-crafted in Excel to include appropriate styling, borders, day names and room names.
+# These are read from the spreadsheet template rather than only from the event feed, to provide configurability
+# of the output. For example, if a row were added to the template for weekly events on a Saturday, then the program
+# would include such events in the table, instead of ignoring them as it does at present.
+#
+# Parse command line options
 begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
@@ -100,26 +111,26 @@ begin
     end
   end
 
+  # Read additional configuration from the config file.
   config = YAML.safe_load_file(opts[:config])
+  # Open the JSON output file, if used.  XXX: JSON output only includes weekly events
   jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
   puts "Writing Excel output to #{opts[:excel]}" if opts[:excel] && opts.verbose?
 
   # If month is specified and is zero, select all events rather than just that month's events.
   # NB: could just check for month == 0.
   select_all = opts[:month] && (opts[:month]).zero?
-  month = opts[:month] || (Date.new >> 2).strftime('%m').to_i
-  year = opts[:year] || Time.now.strftime('%Y').to_i
+  # By default, use next month and its year
+  month = opts[:month] || (Date.today >> 1).month
+  year = opts[:year] || (Date.today >> 1).year
   window_start = Date.new(year, month, 1).to_time
   window_end = (Date.new(year, month, 1) >> 1).to_time
   puts "Selected month: #{year} #{month}" if opts.debug?
 
   ics = nil
   ics = File.read opts[:read_file] if opts[:read_file]
-  cal = Vcalendar.parse(ics, false)
-  rcal = cal.to_hash
-  events = rcal[:VCALENDAR][:VEVENT]
-
-  parsed_events = events.map do |event|
+  vevents = Vcalendar.parse(ics, false).to_hash[:VCALENDAR][:VEVENT]
+  parsed_events = vevents.map do |event|
     Event.new(event, config['weekly'])
   end
   parsed_events.sort_by!(&:start)
@@ -137,11 +148,14 @@ begin
     puts "* Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
   end
 
+  # Sort the weekly events by day-of-week, uniquify, re-sort and group by day-of-week
   wkt = weekly_events.sort_by(&:day).sort_by(&:start).uniq(&:desc_and_times).sort_by(&:day).group_by(&:day)
+  # Make a table of day-of-week with columns for each room
   wkt_by_day = wkt.map do |day, pevs|
     { day: DAYS[day], events: pevs.sort_by(&:start).group_by(&:room) }
   end
 
+  # Group the remaining (non-weekly) events by date, and make a table of them with columns for each room
   ott = other_events.group_by(&:date).map do |date, pevs|
     { date: date, events: pevs.sort_by(&:start).group_by(&:room) }
   end
