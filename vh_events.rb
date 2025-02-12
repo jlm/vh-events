@@ -127,7 +127,7 @@ begin
   window_end = (Date.new(year, month, 1) >> 1).to_time unless select_all
   puts "Selected month: #{year} #{month}" if opts.debug?
 
-  ics = (opts[:read_file] ? File.read(opts[:read_file]) : URI.open(config['url'])).read.gsub(/\r\n/, "\n")
+  ics = (opts[:read_file] ? File.open(opts[:read_file]) : URI.open(config['url'])).read.gsub(/\r\n/, "\n")
   vevents = Vcalendar.parse(ics, false).to_hash[:VCALENDAR][:VEVENT]
   parsed_events = vevents.map do |event|
     Event.new(event, config['weekly'])
