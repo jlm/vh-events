@@ -97,10 +97,10 @@ begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
     o.string '-r', '--read-file', 'Read iCal data from file'
+    o.integer '-m', '--month', 'the month to search, default: next month'
     o.integer '-y', '--year', 'the year to search'
-    o.integer '-m', '--month', 'the month to search'
     o.bool '-d', '--debug', 'debug mode'
-    o.bool '-a', '--print-all', 'print all selected events'
+    o.bool '-a', '--print-all', 'print all events'
     o.bool '-v', '--verbose', 'be verbose: list extra detail'
     o.string '-j', '--json', 'output results in JSON to the named file'
     o.string '-x', '--excel', 'output results in XLSX to the named file'
@@ -123,8 +123,8 @@ begin
   # By default, use next month and its year
   month = opts[:month] || (Date.today >> 1).month
   year = opts[:year] || (Date.today >> 1).year
-  window_start = Date.new(year, month, 1).to_time
-  window_end = (Date.new(year, month, 1) >> 1).to_time
+  window_start = Date.new(year, month, 1).to_time unless select_all
+  window_end = (Date.new(year, month, 1) >> 1).to_time unless select_all
   puts "Selected month: #{year} #{month}" if opts.debug?
 
   ics = (opts[:read_file] ? File.read(opts[:read_file]) : URI.open(config['url'])).read.gsub(/\r\n/, "\n")
@@ -133,12 +133,13 @@ begin
     Event.new(event, config['weekly'])
   end
   parsed_events.sort_by!(&:start)
-  print_events(parsed_events, 'Events in window') if opts.print_all?
+  print_events(parsed_events, 'All events in feed') if opts.print_all?
   unless select_all
     parsed_events.reject! do |pev|
       pev.start < window_start || pev.end > window_end
     end
   end
+  print_events(parsed_events, 'Selected events') if opts.list?
 
   weekly_events = parsed_events.select(&:weekly)
   other_events = parsed_events.reject(&:weekly)
