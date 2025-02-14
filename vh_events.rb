@@ -24,6 +24,8 @@ require 'json'
 require 'active_support/core_ext/integer/inflections'
 require './event'
 require './template_parser'
+require 'rubyXL/convenience_methods/workbook'
+require 'rubyXL/convenience_methods/cell'
 
 DAYS = { 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday',
          6 => 'Saturday' }.freeze
@@ -35,6 +37,14 @@ def print_events(events, title)
   end
 end
 
+WEIGHT = 'thin'
+def set_cell_borders(worksheet, row, col)
+  worksheet[row][col].change_border(:top, WEIGHT)
+  worksheet[row][col].change_border(:bottom, WEIGHT)
+  worksheet[row][col].change_border(:left, WEIGHT)
+  worksheet[row][col].change_border(:right, WEIGHT)
+end
+
 def add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
   (0..(other_events_by_date.length - 1)).each do |ev_index|
     rownumber = other_events_startline + 1 + ev_index
@@ -42,6 +52,7 @@ def add_monthly_events_to_worksheet(template, other_events_by_date, other_events
     date = oe_entry[:date]
     datestring = date.strftime('%a ') + date.day.ordinalize + date.strftime(' %b')
     template.worksheet.add_cell(rownumber, template.daycol, datestring)
+    set_cell_borders(template.worksheet, rownumber, template.daycol)
     event_descs = {}
     oe_entry[:events].each_value do |pevs|
       pevs.each do |event|
@@ -54,6 +65,8 @@ def add_monthly_events_to_worksheet(template, other_events_by_date, other_events
     end
     event_descs.each do |room, event_descriptions|
       template.worksheet.add_cell(rownumber, template.roomcolumns[room], event_descriptions.join("\n"))
+      template.worksheet[rownumber][template.roomcolumns[room]].change_text_wrap(true)
+      set_cell_borders(template.worksheet, rownumber, template.roomcolumns[room])
     end
   end
 end
@@ -65,6 +78,8 @@ def add_weekly_events_to_worksheet(template, wkt_by_day)
 
       entry[:events].each do |room, pevs|
         template.worksheet.add_cell(rownumber, template.roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
+        template.worksheet[rownumber][template.roomcolumns[room]].change_text_wrap(true)
+        set_cell_borders(template.worksheet, rownumber, template.roomcolumns[room])
       end
     end
   end
