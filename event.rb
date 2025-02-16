@@ -89,6 +89,10 @@ class Event
     "#{@desc} #{@start.strftime('%H:%M')} - #{@end.strftime('%H:%M')}"
   end
 
+  def day_desc_and_times
+    "#{@start.strftime('%a')} #{@desc} #{@start.strftime('%H:%M')} - #{@end.strftime('%H:%M')}"
+  end
+
   def date
     @start.to_date
   end
