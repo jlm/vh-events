@@ -164,7 +164,7 @@ begin
   end
 
   # Sort the weekly events by day-of-week, uniquify, re-sort and group by day-of-week
-  wkt = weekly_events.sort_by(&:day).sort_by(&:start).uniq(&:desc_and_times).sort_by(&:day).group_by(&:day)
+  wkt = weekly_events.uniq(&:day_desc_and_times).sort_by(&:day).group_by(&:day)
   # Make a table of day-of-week with columns for each room
   wkt_by_day = wkt.map do |day, pevs|
     { day: DAYS[day], events: pevs.sort_by(&:start).group_by(&:room) }
