@@ -39,6 +39,27 @@ class TemplateParser
     nil
   end
 
+  def parse_config
+    @configws = @workbook['Config']
+    raise 'No Config sheet found in template' unless @configws
+
+    configrow = nil
+    @configws.each_with_object([]) do |row, result|
+      if /name in feed/i.match?(row[0].value)
+        configrow = row.r - 1
+        next
+      end
+      next unless configrow
+
+      puts "Here is a line starting #{row[0].value}" if @debug
+      result << { 'pattern' => row[0]&.value,
+                  'pub_name' => row[1]&.value,
+                  'weekly' => /ye?s?/i.match(row[2]&.value),
+                  'time_rule' => row[3]&.value }
+      _james = 2
+    end
+  end
+  
   private
 
   def parse_template(worksheet)

@@ -86,8 +86,6 @@ def add_weekly_events_to_worksheet(template, wkt_by_day)
 end
 
 def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, excel_conf, debug)
-  template = TemplateParser.new(excel_conf['template'], DAYS, debug: debug)
-
   add_weekly_events_to_worksheet(template, wkt_by_day)
   other_events_startline = template.find_monthly_section
   raise "Couldn't find start of monthly section" unless other_events_startline
@@ -111,6 +109,8 @@ end
 begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
+    o.bool '-C', '--config-from-template', 'take rewrite rules from the template file'
+    o.string '-t', '--template', 'name of the Excel template file to read'
     o.string '-r', '--read-file', 'Read iCal data from file'
     o.integer '-m', '--month', 'the (numeric) month to search, default: next month'
     o.integer '-y', '--year', 'the year to search'
@@ -131,6 +131,16 @@ begin
   # Open the JSON output file, if used.  XXX: JSON output only includes weekly events
   jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
   puts "Writing Excel output to #{opts[:excel]}" if opts[:excel] && opts.verbose?
+  template_name = opts[:template] || (config['excel'] ? config['excel']['template'] : nil)
+  template = parse_config = nil
+  if template_name
+    template = TemplateParser.new(template_name, DAYS, debug: opts.debug?)
+    if opts.config_from_template? || (config['excel'] && config['excel']['config-from-template'])
+      parse_config = template.parse_config
+    end
+  else
+    parse_config = config['parse-config']
+  end
 
   # If month is specified and is zero, select all events rather than just that month's events.
   # NB: could just check for month == 0.
@@ -145,7 +155,7 @@ begin
   ics = (opts[:read_file] ? File.open(opts[:read_file]) : URI.open(config['url'])).read.gsub(/\r\n/, "\n")
   vevents = Vcalendar.parse(ics, false).to_hash[:VCALENDAR][:VEVENT]
   parsed_events = vevents.map do |event|
-    Event.new(event, config['weekly'])
+    Event.new(event, parse_config)
   end
   parsed_events.sort_by!(&:start)
   print_events(parsed_events, 'All events in feed') if opts.print_all?

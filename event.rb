@@ -47,12 +47,33 @@ class Event
     @end = vtparse(event_hash[:DTEND])
     @desc = event_hash[:SUMMARY][:value]
     @weekly = false
-    weekly_patterns.each do |pstr|
-      (patternstr, substitute) = pstr.split('|')
-      pattern = Regexp.new(patternstr, 'i')
-      if pattern.match? desc
-        @weekly = true
-        @desc = substitute if substitute
+    if false
+      weekly_patterns.each do |pstr|
+        (patternstr, substitute) = pstr.split('|')
+        pattern = Regexp.new(patternstr, 'i')
+        if pattern.match? desc
+          @weekly = true
+          @desc = substitute if substitute
+        end
+      end
+    else
+      parsed_config.each do |rule|
+        pattern = Regexp.new(rule['pattern'], 'i')
+        next unless pattern.match? desc
+
+        @weekly = rule['weekly']
+        @desc = rule['pub'] if rule[:pub]
+        @time_rule = rule['time_rule']
+        case @time_rule
+        when /\+(\d+)/
+          @start += 60 * $1.to_i
+        when /\-(\d+)/
+          @end -= 60 * $1.to_i
+        else
+          _notimplemented = 0
+          # Make @start be the same day but with the time set to @time_rule XXX
+        end
+
       end
     end
     descstr = event_hash[:DESCRIPTION][:value].split(/\n/)
