@@ -110,18 +110,18 @@ end
 # Parse command line options
 begin
   opts = Slop.parse do |o|
-    o.string '-c', '--config', 'configuration YAML file name', default: 'config.yml'
+    o.string '-c', '--config', 'configuration YAML file name (default: config.yml)', default: 'config.yml'
     o.bool '-C', '--config-from-template', 'take rewrite rules from the template file'
     o.string '-t', '--template', 'name of the Excel template file to read'
-    o.string '-r', '--read-file', 'Read iCal data from file'
-    o.integer '-m', '--month', 'the (numeric) month to search, default: next month'
+    o.string '-r', '--read-file', 'Read iCal data from file (default: read from URL in config file)'
+    o.integer '-m', '--month', 'the (numeric) month to search (default: next month)'
     o.integer '-y', '--year', 'the year to search'
     o.bool '-d', '--debug', 'debug mode'
-    o.bool '-a', '--print-all', 'print all events'
     o.bool '-v', '--verbose', 'be verbose: list extra detail'
+    o.bool '-a', '--print-all', 'print all events'
     o.string '-j', '--json', 'output results in JSON to the named file'
     o.string '-x', '--excel', 'output results in XLSX to the named file'
-    o.bool '-l', '--list', 'list events'
+    o.bool '-l', '--list', 'list events to standard output'
     o.on '--help' do
       warn o
       exit

@@ -26,29 +26,32 @@ be overridden with the `--read-file` flag.
 `--year` and `--month` flags.
 ```aiignore
 usage: vh_events.rb [options]
-    -c, --config     configuration YAML file name
-    -r, --read-file  Read iCal data from file
-    -m, --month      the (numeric) month to search, default: next month
-    -y, --year       the year to search
-    -d, --debug      debug mode
-    -a, --print-all  print all events
-    -v, --verbose    be verbose: list extra detail
-    -j, --json       output results in JSON to the named file
-    -x, --excel      output results in XLSX to the named file
-    -l, --list       list events
+    -c, --config                configuration YAML file name (default: config.yml)
+    -C, --config-from-template  take rewrite rules from the template file
+    -t, --template              name of the Excel template file to read
+    -r, --read-file             Read iCal data from file (default: read from URL in config file)
+    -m, --month                 the (numeric) month to search (default: next month)
+    -y, --year                  the year to search
+    -d, --debug                 debug mode
+    -v, --verbose               be verbose: list extra detail
+    -a, --print-all             print all events
+    -j, --json                  output results in JSON to the named file
+    -x, --excel                 output results in XLSX to the named file
+    -l, --list                  list events to standard output
     --help
-
 ```
 Weekly events
 =============
 
 The substance of the code is involved with recognising and grouping weekly events
 to make a useful table.  Although Hallmaster can classify events as weekly,
-people booking events often don't book them as such. Instead, the program reads a
-configuration file (typically `config.yml`) that specifies which events are weekly.
-The configuration file entries can be regular expressions to allow flexibility in
-matching event names.  The event names can also be re-written to allow the published
-name of an event to differ from the way it is shown in the event feed.
+people booking events often don't book them as such. Instead, a set of rules can be provided
+which specify which events are weekly, and allow re-writing of the event names and modification
+of their times.  These rules can be provided in a 
+configuration file (typically `config.yml`) or in the Excel template file in a special 'Config' tab.
+Re-writing the event names allows the published name of an event to differ from the way it is shown
+in the event feed.  Re-writing event times allows the published times to be different from the booked
+times, to allow for set-up and clearing up time.
 
 License and Copyright
 =======
