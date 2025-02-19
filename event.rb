@@ -18,6 +18,7 @@
 require 'rubygems'
 require 'bundler'
 Bundler.setup(:default)
+require 'active_support/core_ext/time'
 
 class TimeWithTimezone < Time
   require 'timezone'
@@ -41,44 +42,46 @@ class Event
     start <=> other.start
   end
 
-  def initialize(event_hash, weekly_patterns)
+  # Given a time, parse new_time_string and extract just the hour and minute.  Return a time object based on the
+  # time provided, but with the hour and minute replaced by those from the new_time_string.
+  def change_time(a_time, new_time_string)
+    new_time = Time.parse(new_time_string)
+    a_time.change(hour: new_time.hour, min: new_time.min)
+  end
+
+  def initialize(event_hash, parsed_config)
     @start = vtparse(event_hash[:DTSTART])
     @day = @start.wday
     @end = vtparse(event_hash[:DTEND])
     @desc = event_hash[:SUMMARY][:value]
-    @weekly = false
-    if false
-      weekly_patterns.each do |pstr|
-        (patternstr, substitute) = pstr.split('|')
-        pattern = Regexp.new(patternstr, 'i')
-        if pattern.match? desc
-          @weekly = true
-          @desc = substitute if substitute
-        end
-      end
-    else
-      parsed_config.each do |rule|
-        pattern = Regexp.new(rule['pattern'], 'i')
-        next unless pattern.match? desc
-
-        @weekly = rule['weekly']
-        @desc = rule['pub'] if rule[:pub]
-        @time_rule = rule['time_rule']
-        case @time_rule
-        when /\+(\d+)/
-          @start += 60 * $1.to_i
-        when /\-(\d+)/
-          @end -= 60 * $1.to_i
-        else
-          _notimplemented = 0
-          # Make @start be the same day but with the time set to @time_rule XXX
-        end
-
-      end
-    end
     descstr = event_hash[:DESCRIPTION][:value].split(/\n/)
     @room = descstr[2]
     @url = event_hash[:URL][:value]
+    @weekly = false
+    parsed_config&.each do |rule|
+      pattern = Regexp.new(rule['pattern'], 'i')
+      next unless pattern.match? desc
+
+      @weekly = rule['weekly']
+      @desc = rule['pub'] if rule['pub']
+      @time_rule = rule['time_rule']
+      case @time_rule
+      when nil
+        # nothing to do
+      when /^=(\d+:\d+)(-(\d+:\d+))?/
+        # Change @start and maybe @end times to be the same day but with the times set as per @time_rule
+        @start = change_time(@start, ::Regexp.last_match(1))
+        @end = change_time(@end, ::Regexp.last_match(3)) if ::Regexp.last_match(3)
+        _james = 12
+      when /\+(\d+)(-(\d+))?/
+        @start += 60 * ::Regexp.last_match(1).to_i
+        @end += 60 * ::Regexp.last_match(2).to_i if ::Regexp.last_match(2) # NOTE: this would be end = end + 60 * (-30)
+      when /-(\d+)/
+        @end -= 60 * ::Regexp.last_match(1).to_i
+      else
+        puts "Warning: can't parse time_rule: #{@time_rule}"
+      end
+    end
   end
 
   def short_event_times

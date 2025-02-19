@@ -22,6 +22,8 @@ Bundler.require
 require 'vcalendar'
 require 'json'
 require 'active_support/core_ext/integer/inflections'
+require 'active_support/deprecation'
+require 'active_support/deprecator'
 require './event'
 require './template_parser'
 require 'rubyXL/convenience_methods/workbook'
@@ -85,10 +87,10 @@ def add_weekly_events_to_worksheet(template, wkt_by_day)
   end
 end
 
-def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, excel_conf, debug)
+def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, template)
   add_weekly_events_to_worksheet(template, wkt_by_day)
   other_events_startline = template.find_monthly_section
-  raise "Couldn't find start of monthly section" unless other_events_startline
+  raise "Couldn't find start of monthly section in template file" unless other_events_startline
 
   add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
   template.workbook.write(excel_filename)
@@ -132,15 +134,18 @@ begin
   jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
   puts "Writing Excel output to #{opts[:excel]}" if opts[:excel] && opts.verbose?
   template_name = opts[:template] || (config['excel'] ? config['excel']['template'] : nil)
-  template = parse_config = nil
-  if template_name
-    template = TemplateParser.new(template_name, DAYS, debug: opts.debug?)
-    if opts.config_from_template? || (config['excel'] && config['excel']['config-from-template'])
-      parse_config = template.parse_config
-    end
+  template = nil
+  template = TemplateParser.new(template_name, DAYS, debug: opts.debug?) if template_name
+  abort('Excel output selected but no template provided') if template.nil? && opts[:excel]
+
+  if template_name && (opts.config_from_template? || (config['excel'] && config['excel']['config_from_template']))
+    puts 'Reading parse_rules from the Excel template file' if opts.verbose?
+    parse_config = template&.parse_config
   else
-    parse_config = config['parse-config']
+    puts "Reading parse_rules from #{opts['config']}" if opts.verbose?
+    parse_config = config['parse_rules']
   end
+  warn 'No parsing configuration rules found' if parse_config.nil?
 
   # If month is specified and is zero, select all events rather than just that month's events.
   # NB: could just check for month == 0.
@@ -173,7 +178,7 @@ begin
     puts "* Number of events: #{parsed_events.size}. Weekly: #{weekly_events.size}. Other Events: #{other_events.size}"
   end
 
-  # Sort the weekly events by day-of-week, uniquify, re-sort and group by day-of-week
+  # Uniquify the weekly events, sort and group by day-of-week
   wkt = weekly_events.uniq(&:day_desc_and_times).sort_by(&:day).group_by(&:day)
   # Make a table of day-of-week with columns for each room
   wkt_by_day = wkt.map do |day, pevs|
@@ -186,7 +191,7 @@ begin
   end
 
   jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
-  output_events_as_xlsx(wkt_by_day, ott, opts[:excel], config['excel'], opts.debug?) if opts[:excel]
+  output_events_as_xlsx(wkt_by_day, ott, opts[:excel], template) if opts[:excel]
 
   # print_events(weekly_events, 'Weekly Events')
 end

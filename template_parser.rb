@@ -51,11 +51,11 @@ class TemplateParser
       end
       next unless configrow
 
-      puts "Here is a line starting #{row[0].value}" if @debug
       result << { 'pattern' => row[0]&.value,
                   'pub_name' => row[1]&.value,
-                  'weekly' => /ye?s?/i.match(row[2]&.value),
-                  'time_rule' => row[3]&.value }
+                  'weekly' => /ye?s?/i.match(row[2]&.value) || /true/i.match(row[2]&.value),
+                  'time_rule' => row[3]&.value,
+                  'termtime' => /ye?s?/i.match(row[4]&.value) || /true/i.match(row[4]&.value) }
       _james = 2
     end
   end

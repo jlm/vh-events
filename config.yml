@@ -1,7 +1,8 @@
 url: https://v2.hallmaster.co.uk/api/ical/GetICalStream?HallId=7609&listrooms=true&splitseries=true&onlyconfirmed=true
 excel:
   template: template/table-only.xlsx
-weekly:
+  config_from_template: true
+unused_weekly:
   - pilates
   - dance class
   - art group
@@ -11,7 +12,7 @@ weekly:
   - circuit
   - badminton
   - adult tap
-parse_template:
+unused_parse_rules:
   -
     pattern: toddler group
     pub_name: Baby and Toddler Group
@@ -19,6 +20,32 @@ parse_template:
   -
     pattern: v\s*x\s*club
     weekly: true
+    termtime: true
   -
     pattern: village hall lunches
-    time_rule: "+15"
+    time_rule: "+15-30"
+  -
+    pattern: adult tap
+    weekly: true
+  -
+    pattern: art group
+    weekly: true
+  -
+    pattern: pilates
+    weekly: true
+  -
+    pattern: dance class
+    weekly: true
+    termtime: true
+  -
+    pattern: badminton
+    weekly: true
+  -
+    pattern: circuit
+    weekly: true
+  -
+    pattern: yoga
+    weekly: true
+  -
+    pattern: coffee shop
+    time_rule: "+45"
