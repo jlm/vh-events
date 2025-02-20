@@ -1,6 +1,6 @@
 url: https://v2.hallmaster.co.uk/api/ical/GetICalStream?HallId=7609&listrooms=true&splitseries=true&onlyconfirmed=true
 excel:
-  template: template/table-only.xlsx
+  template: template/table-config.xlsx
   config_from_template: true
 unused_weekly:
   - pilates

@@ -15,7 +15,7 @@ Create the Excel template file (which is in XLSX format) and place it in the `te
 An example is provided as `template/table-only.xlsx`.
 
 Typical usage:
-```aiignore
+```shell
 ruby vh-events.rb --excel tmp/event-table.xlsx
 ```
 
@@ -24,7 +24,7 @@ By default:
 be overridden with the `--read-file` flag.
 * only events from the month following the current month are selected.  This can be overridden with the
 `--year` and `--month` flags.
-```aiignore
+```allignore
 usage: vh_events.rb [options]
     -c, --config                configuration YAML file name (default: config.yml)
     -C, --config-from-template  take rewrite rules from the template file
@@ -53,6 +53,25 @@ Re-writing the event names allows the published name of an event to differ from 
 in the event feed.  Re-writing event times allows the published times to be different from the booked
 times, to allow for set-up and clearing up time.
 
+Building a docker image
+=======================
+```shell
+docker compose build
+```
+The above command builds the `vh_events:latest` image.
+
+Running the program using docker
+================================
+Build the image as shown above.  Then, create a new directory somewhere and copy `docker-compose.yml` into it.
+Make a new subdirectory called `out` to contain the output file. Then run the script:
+```shell
+cp /somewhere/docker-compose.yml .
+mkdir out
+docker run --rm app
+# output file should be in the out directory:
+ls -l out/
+
+```
 License and Copyright
 =======
 This program is licensed under the Apache License.  See the `LICENSE` file for details.

@@ -1,0 +1,8 @@
+name: vh_events
+services:
+  app:
+    image: vh_events:latest
+    volumes:
+      - ./out:/out
+    restart: no
+    build: .
