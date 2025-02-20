@@ -40,11 +40,16 @@ def print_events(events, title)
 end
 
 WEIGHT = 'thin'
-def set_cell_borders(worksheet, row, col)
-  worksheet[row][col].change_border(:top, WEIGHT)
-  worksheet[row][col].change_border(:bottom, WEIGHT)
-  worksheet[row][col].change_border(:left, WEIGHT)
-  worksheet[row][col].change_border(:right, WEIGHT)
+
+def new_cell(template, row, column, content, wrap: true)
+  template.worksheet.add_cell(row, column, content)
+  cell = template.worksheet[row][column]
+  cell.change_text_wrap(wrap)
+  cell.change_text_indent(1)
+  cell.change_border(:top, WEIGHT)
+  cell.change_border(:bottom, WEIGHT)
+  cell.change_border(:left, WEIGHT)
+  cell.change_border(:right, WEIGHT)
 end
 
 def add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
@@ -53,8 +58,7 @@ def add_monthly_events_to_worksheet(template, other_events_by_date, other_events
     oe_entry = other_events_by_date[ev_index]
     date = oe_entry[:date]
     datestring = date.strftime('%a ') + date.day.ordinalize + date.strftime(' %b')
-    template.worksheet.add_cell(rownumber, template.daycol, datestring)
-    set_cell_borders(template.worksheet, rownumber, template.daycol)
+    new_cell(template, rownumber, template.daycol, datestring, wrap: false)
     event_descs = {}
     oe_entry[:events].each_value do |pevs|
       pevs.each do |event|
@@ -66,9 +70,7 @@ def add_monthly_events_to_worksheet(template, other_events_by_date, other_events
       end
     end
     event_descs.each do |room, event_descriptions|
-      template.worksheet.add_cell(rownumber, template.roomcolumns[room], event_descriptions.join("\n"))
-      template.worksheet[rownumber][template.roomcolumns[room]].change_text_wrap(true)
-      set_cell_borders(template.worksheet, rownumber, template.roomcolumns[room])
+      new_cell(template, rownumber, template.roomcolumns[room], event_descriptions.join("\n"))
     end
   end
 end
@@ -79,9 +81,7 @@ def add_weekly_events_to_worksheet(template, wkt_by_day)
       next unless template.worksheet[rownumber][template.daycol].value == entry[:day]
 
       entry[:events].each do |room, pevs|
-        template.worksheet.add_cell(rownumber, template.roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
-        template.worksheet[rownumber][template.roomcolumns[room]].change_text_wrap(true)
-        set_cell_borders(template.worksheet, rownumber, template.roomcolumns[room])
+        new_cell(template, rownumber, template.roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
       end
     end
   end
@@ -89,9 +89,7 @@ end
 
 def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, template)
   add_weekly_events_to_worksheet(template, wkt_by_day)
-  other_events_startline = template.find_monthly_section
-  raise "Couldn't find start of monthly section in template file" unless other_events_startline
-
+  other_events_startline = template.find_monthly_section || raise("Couldn't find monthly section in template file")
   add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
   template.workbook.write(excel_filename)
 end
