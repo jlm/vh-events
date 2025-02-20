@@ -39,61 +39,6 @@ def print_events(events, title)
   end
 end
 
-WEIGHT = 'thin'
-
-def new_cell(template, row, column, content, wrap: true)
-  template.worksheet.add_cell(row, column, content)
-  cell = template.worksheet[row][column]
-  cell.change_text_wrap(wrap)
-  cell.change_text_indent(1)
-  cell.change_border(:top, WEIGHT)
-  cell.change_border(:bottom, WEIGHT)
-  cell.change_border(:left, WEIGHT)
-  cell.change_border(:right, WEIGHT)
-end
-
-def add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
-  (0..(other_events_by_date.length - 1)).each do |ev_index|
-    rownumber = other_events_startline + 1 + ev_index
-    oe_entry = other_events_by_date[ev_index]
-    date = oe_entry[:date]
-    datestring = date.strftime('%a ') + date.day.ordinalize + date.strftime(' %b')
-    new_cell(template, rownumber, template.daycol, datestring, wrap: false)
-    event_descs = {}
-    oe_entry[:events].each_value do |pevs|
-      pevs.each do |event|
-        event.room.split(', ').each do |room|
-          puts "#{rownumber} #{datestring} #{room} #{event.desc_and_times}" if template.debug
-          event_descs[room] ||= []
-          event_descs[room] << event.desc_and_times
-        end
-      end
-    end
-    event_descs.each do |room, event_descriptions|
-      new_cell(template, rownumber, template.roomcolumns[room], event_descriptions.join("\n"))
-    end
-  end
-end
-
-def add_weekly_events_to_worksheet(template, wkt_by_day)
-  wkt_by_day.each do |entry|
-    ((template.dayrow + 1)..(template.dayrow + 8)).each do |rownumber|
-      next unless template.worksheet[rownumber][template.daycol].value == entry[:day]
-
-      entry[:events].each do |room, pevs|
-        new_cell(template, rownumber, template.roomcolumns[room], pevs.map(&:desc_and_times).join("\n"))
-      end
-    end
-  end
-end
-
-def output_events_as_xlsx(wkt_by_day, other_events_by_date, excel_filename, template)
-  add_weekly_events_to_worksheet(template, wkt_by_day)
-  other_events_startline = template.find_monthly_section || raise("Couldn't find monthly section in template file")
-  add_monthly_events_to_worksheet(template, other_events_by_date, other_events_startline)
-  template.workbook.write(excel_filename)
-end
-
 # This program parses a Vcalendar feed of Village Hall events produced by Hallmaster, and produces
 # an Excel spreadsheet for inclusion in the Magazine.  A configuration file (config.yml) allows events to be
 # categorized as weekly (with others being designated non-weekly), and to be recognised using a regular expression
@@ -189,7 +134,7 @@ begin
   end
 
   jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
-  output_events_as_xlsx(wkt_by_day, ott, opts[:excel], template) if opts[:excel]
+  template.output_events_as_xlsx(wkt_by_day, ott, opts[:excel]) if opts[:excel]
 
   # print_events(weekly_events, 'Weekly Events')
 end
