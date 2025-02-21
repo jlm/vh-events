@@ -1,26 +1,41 @@
+# This is the configuration file for vh_events.rb.
+# Some optional config settings have been inactivated by adding "unused_" at the start of their names. To use
+# those settings, remove the string "unused_".
+#
+# url: This is the web address of the vCalender/iCal stream you want to create a table from.
 url: https://v2.hallmaster.co.uk/api/ical/GetICalStream?HallId=7609&listrooms=true&splitseries=true&onlyconfirmed=true
+# excel: introduces configuration relating to parsing an Excel input file
+#   template: the pathname of Excel template to parse. Its first tab contains the Template table.
+#   config_from_template: if this key is present and set to "true", then look for a 'Config' tab in the template file
+#   containing event parsing instructions, which over-ride the ones in this file.
 excel:
   template: template/table-config.xlsx
   config_from_template: true
-unused_weekly:
-  - pilates
-  - dance class
-  - art group
-  - v\s*x\s*club
-  - toddler group|Baby and Toddler Group
-  - yoga
-  - circuit
-  - badminton
-  - adult tap
+# Configuration for sending results by email (with the --email command line option):
+# NOTE that instead of putting these sensitive details in the configuration file, they can be set in environment
+# variables instead, which is more secure. The environment variable is shown in parentheses.
+# mail_from: the sender address for the email message to be generated (MAIL_FROM)
+unused_mail_from: sender@example.com
+# mail_to: the address to which the message is to be sent (MAIL_TO)
+unused_mail_to: recipient@example.com
+# postmark_api_key: if using the postmarkapp.com service for emailing, this should be set to your authorization code
+# (POSTMARK_API_KEY)
+unused_postmark_api_key: 0000034-0306577-abcde
+# Rules for editing the event details from the feed before publishing them in the output table.  NOTE that instead of
+# putting the rules here, you can use the 'Config' tab in the Excel template file, which is more user-friendly.
 unused_parse_rules:
+# "toddler group" in the feed should be shown as "Baby and Toddler Group" and should be shown in the "weekly" table.
   -
     pattern: toddler group
     pub_name: Baby and Toddler Group
     weekly: true
+# The pattern is a Ruby Regexp: a regular expression.  The next example means: search for v, then whitespace, then x,
+# then whitespace, then club.  All the patterns in the parse rules are case-insensitive.
   -
     pattern: v\s*x\s*club
     weekly: true
     termtime: true
+# The time_rule in the next example means "Add 15 minutes onto the start time, and subtract 30 minutes from the end time".
   -
     pattern: village hall lunches
     time_rule: "+15-30"
