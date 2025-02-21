@@ -66,7 +66,8 @@ The above command builds the `vh_events:latest` image.
 Running the program using Docker Compose
 ========================================
 Build the image as shown above.  Then, create a new directory somewhere and copy `docker-compose.yml` into it.
-Adjust that file to fit your needs.
+Adjust that file to fit your needs. Note that if you use the `POSTMARK_API_KEY` environment varibale, you should
+not enclose the value in quotes, as that makes it invalid.
 Make a new subdirectory called `out` to contain the output file. Then run the script:
 ```shell
 cp /somewhere/docker-compose.yml .
