@@ -144,14 +144,14 @@ begin
     template.output_events_as_xlsx(wkt_by_day, ott, filename)
     if opts[:email]
       mail_from = config['mail_from'] || ENV['MAIL_FROM']
-      mail_to = config['mail_to'] || ENV['MAIL_TO']
+      mail_to = (config['mail_to'] || ENV['MAIL_TO']).split(',').map(&:strip)
       postmark_api_key = config['postmark_api_key'] || ENV['POSTMARK_API_KEY']
 
       message = Mail.new do
         from            mail_from
         to              mail_to
         subject         "Events table for #{year}-#{month}"
-        body            'Please find enclosed the auto-generated events table.'
+        body            "Please find enclosed the auto-generated events table.\n"
 
         delivery_method Mail::Postmark, api_token: postmark_api_key
       end
@@ -159,6 +159,11 @@ begin
       _dir, rest = File.split(filename)
       message.attachments[rest] = File.read(filename)
       message.deliver
+      if message.delivered
+        puts "Message #{message.postmark_response['MessageID']} delivered to #{mail_to.size} recipients" if opts.verbose?
+      else
+        warn 'Message not delivered'
+      end
     end
   end
   jfile&.puts JSON.pretty_generate(wkt_by_day)
