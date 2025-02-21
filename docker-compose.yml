@@ -2,12 +2,12 @@ name: vh_events
 services:
   app:
     image: vh_events:latest
-    command: ruby ./vh_events.rb -v --excel /out/events.xlsx
+    command: ruby ./vh_events.rb -v --excel /out/events.xlsx --email
     volumes:
       - ./out:/out
     environment:
       - MAIL_FROM="sender@example.com"
       - MAIL_TO="recipient@example.com"
-      - POSTMARK_API_KEY="aaaaa-bbb-ccc-123
+      - POSTMARK_API_KEY=aaaaa-bbb-ccc-123
     restart: no
     build: .
