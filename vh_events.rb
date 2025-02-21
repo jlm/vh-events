@@ -64,6 +64,7 @@ begin
     o.bool '-a', '--print-all', 'print all events'
     o.string '-j', '--json', 'output results in JSON to the named file'
     o.string '-x', '--excel', 'output results in XLSX to the named file'
+    o.bool '-e', '--email', 'email the output file to the address in config file'
     o.bool '-l', '--list', 'list events to standard output'
     o.on '--help' do
       warn o
@@ -74,13 +75,14 @@ begin
   # Read additional configuration from the config file.
   config = YAML.safe_load_file(opts[:config])
   # Open the JSON output file, if used.  XXX: JSON output only includes weekly events
-  jfile = opts[:json] ? File.open(opts[:json], 'w') : $stdout
+  jfile = opts[:json] ? File.open(opts[:json], 'w') : nil
+  # Process Excel options and open Excel template file
   puts "Writing Excel output to #{opts[:excel]}" if opts[:excel] && opts.verbose?
   template_name = opts[:template] || (config['excel'] ? config['excel']['template'] : nil)
   template = nil
   template = TemplateParser.new(template_name, DAYS, debug: opts.debug?) if template_name
   abort('Excel output selected but no template provided') if template.nil? && opts[:excel]
-
+  # Read the event parsing rules
   if template_name && (opts.config_from_template? || (config['excel'] && config['excel']['config_from_template']))
     puts 'Reading parse_rules from the Excel template file' if opts.verbose?
     parse_config = template&.parse_config
@@ -90,6 +92,7 @@ begin
   end
   warn 'No parsing configuration rules found' if parse_config.nil?
 
+  # Process event selection command-line options
   # If month is specified and is zero, select all events rather than just that month's events.
   # NB: could just check for month == 0.
   select_all = opts[:month] && (opts[:month]).zero?
@@ -100,11 +103,13 @@ begin
   window_end = (Date.new(year, month, 1) >> 1).to_time unless select_all
   puts "Selected month: #{year} #{month}" if opts.debug?
 
+  # Obtain and parse the event feed or file
   ics = (opts[:read_file] ? File.open(opts[:read_file]) : URI.open(config['url'])).read.gsub(/\r\n/, "\n")
   vevents = Vcalendar.parse(ics, false).to_hash[:VCALENDAR][:VEVENT]
   parsed_events = vevents.map do |event|
     Event.new(event, parse_config)
   end
+  # Select the desired events
   parsed_events.sort_by!(&:start)
   print_events(parsed_events, 'All events in feed') if opts.print_all?
   unless select_all
@@ -133,8 +138,29 @@ begin
     { date: date, events: pevs.sort_by(&:start).group_by(&:room) }
   end
 
-  jfile.puts JSON.pretty_generate(wkt_by_day) if opts.json?
-  template.output_events_as_xlsx(wkt_by_day, ott, opts[:excel]) if opts[:excel]
+  # Process the outputs, saving to files or sending by email
+  if opts[:excel]
+    filename = opts[:excel]
+    template.output_events_as_xlsx(wkt_by_day, ott, filename)
+    if opts[:email]
+      mail_from = config['mail_from'] || ENV['MAIL_FROM']
+      mail_to = config['mail_to'] || ENV['MAIL_TO']
+      postmark_api_key = config['postmark_api_key'] || ENV['POSTMARK_API_KEY']
 
+      message = Mail.new do
+        from            mail_from
+        to              mail_to
+        subject         "Events table for #{year}-#{month}"
+        body            'Please find enclosed the auto-generated events table.'
+
+        delivery_method Mail::Postmark, api_token: postmark_api_key
+      end
+
+      _dir, rest = File.split(filename)
+      message.attachments[rest] = File.read(filename)
+      message.deliver
+    end
+  end
+  jfile&.puts JSON.pretty_generate(wkt_by_day)
   # print_events(weekly_events, 'Weekly Events')
 end
