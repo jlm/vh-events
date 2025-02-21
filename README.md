@@ -14,14 +14,14 @@ Usage
 Create the Excel template file (which is in XLSX format) and place it in the `template` directory.
 An example is provided as `template/table-only.xlsx`.
 
-Typical usage:
+Simple usage:
 ```shell
 ruby vh-events.rb --excel tmp/event-table.xlsx
 ```
 
 By default:
 * the Vcalendar event feed is read from the URL specified in the configuration file. This can
-be overridden with the `--read-file` flag.
+be overridden with the `--read-file` flag.  At present there is no way to specify a URL on the command line.
 * only events from the month following the current month are selected.  This can be overridden with the
 `--year` and `--month` flags.
 ```allignore
@@ -37,6 +37,7 @@ usage: vh_events.rb [options]
     -a, --print-all             print all events
     -j, --json                  output results in JSON to the named file
     -x, --excel                 output results in XLSX to the named file
+    -e, --email                 email the output file to the address in config file
     -l, --list                  list events to standard output
     --help
 ```
@@ -53,21 +54,24 @@ Re-writing the event names allows the published name of an event to differ from 
 in the event feed.  Re-writing event times allows the published times to be different from the booked
 times, to allow for set-up and clearing up time.
 
-Building a docker image
+Building a Docker image
 =======================
+Before building the image, edit the configuration file `config.yml` to set the URL for the event feed, and
+optionally other configuration parameters.
 ```shell
 docker compose build
 ```
 The above command builds the `vh_events:latest` image.
 
-Running the program using docker
-================================
+Running the program using Docker Compose
+========================================
 Build the image as shown above.  Then, create a new directory somewhere and copy `docker-compose.yml` into it.
+Adjust that file to fit your needs.
 Make a new subdirectory called `out` to contain the output file. Then run the script:
 ```shell
 cp /somewhere/docker-compose.yml .
 mkdir out
-docker run --rm app
+docker compose run --rm app
 # output file should be in the out directory:
 ls -l out/
 
